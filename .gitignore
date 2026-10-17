@@ -1,0 +1,22 @@
+node_modules/
+dist/
+dev-dist/
+.vite/
+*.log
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+.wrangler/
+
+### IntelliJ IDEA ###
+.idea/workspace.xml
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+.DS_Store
+.claude/
