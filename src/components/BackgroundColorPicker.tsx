@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getBackgroundContrast } from '../utils/contrast';
+import { MAX_GLASS_TRANSPARENCY } from '../utils/themeStore';
 
 interface Props {
   value: string;
@@ -9,6 +10,8 @@ interface Props {
   hasImage: boolean;
   onImageSelect: (file: File) => Promise<void> | void;
   onImageRemove: () => void;
+  glassTransparency: number;
+  onGlassTransparencyChange: (value: number) => void;
 }
 
 const PALETTE = [
@@ -30,6 +33,8 @@ export function BackgroundColorPicker({
   hasImage,
   onImageSelect,
   onImageRemove,
+  glassTransparency,
+  onGlassTransparencyChange,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -125,7 +130,7 @@ export function BackgroundColorPicker({
         <div
           role="dialog"
           aria-label="Selector de color de fondo"
-          className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-gray-200 bg-white p-3 text-gray-900 shadow-lg"
+          className="glass-card glass-card--solid absolute right-0 z-20 mt-2 w-64 rounded-xl p-3 text-gray-900"
         >
           <p className="mb-2 text-xs font-medium text-gray-700">Color de fondo</p>
 
@@ -187,6 +192,24 @@ export function BackgroundColorPicker({
               </span>
             </p>
           )}
+
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <label className="block text-xs font-medium text-gray-700">
+              <span className="flex items-center justify-between">
+                <span>Transparencia de tarjetas</span>
+                <span className="tabular-nums text-gray-500">{glassTransparency}%</span>
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={MAX_GLASS_TRANSPARENCY}
+                step={5}
+                value={glassTransparency}
+                onChange={(e) => onGlassTransparencyChange(Number(e.target.value))}
+                className="mt-2 w-full accent-emerald-600"
+              />
+            </label>
+          </div>
 
           <div className="mt-3 border-t border-gray-100 pt-3">
             <p className="mb-2 text-xs font-medium text-gray-700">Imagen de fondo</p>

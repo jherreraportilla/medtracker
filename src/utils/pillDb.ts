@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Intake, Treatment } from '../types/treatment';
 
-interface PillDB extends DBSchema {
+export interface PillDB extends DBSchema {
   treatments: {
     key: string;
     value: Treatment;
@@ -19,6 +19,10 @@ const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<PillDB>> | null = null;
 
+function resetDb() {
+  dbPromise = null;
+}
+
 export function getDb(): Promise<IDBPDatabase<PillDB>> {
   if (!dbPromise) {
     dbPromise = openDB<PillDB>(DB_NAME, DB_VERSION, {
@@ -29,9 +33,29 @@ export function getDb(): Promise<IDBPDatabase<PillDB>> {
         intakes.createIndex('by-date', 'date');
         intakes.createIndex('by-treatment', 'treatmentId');
       },
+      blocking() {
+        dbPromise?.then((db) => db.close());
+        resetDb();
+      },
+      terminated: resetDb,
+    }).then((db) => {
+      db.addEventListener('close', resetDb);
+      return db;
     });
+    dbPromise.catch(resetDb);
   }
   return dbPromise;
+}
+
+// iOS Safari drops the IndexedDB connection when a PWA is suspended in background;
+// the next operation fails, so we reopen once and retry.
+export async function withDb<T>(op: (db: IDBPDatabase<PillDB>) => Promise<T>): Promise<T> {
+  try {
+    return await op(await getDb());
+  } catch {
+    resetDb();
+    return op(await getDb());
+  }
 }
 
 export function newId(): string {

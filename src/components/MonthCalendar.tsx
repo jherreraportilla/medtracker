@@ -13,11 +13,11 @@ interface Props {
 }
 
 const CELL_STYLES: Record<DayState, string> = {
-  complete: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-  partial: 'bg-amber-50 border-amber-200 text-amber-900',
-  missed: 'bg-rose-50 border-rose-200 text-rose-900',
-  notDue: 'bg-gray-50 border-gray-200 text-gray-500',
-  future: 'bg-white border-dashed border-gray-300 text-gray-700',
+  complete: 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900',
+  partial: 'bg-amber-50/70 border-amber-200/80 text-amber-900',
+  missed: 'bg-rose-50/70 border-rose-200/80 text-rose-900',
+  notDue: 'bg-gray-50/50 border-gray-200/80 text-gray-500',
+  future: 'bg-white/40 border-dashed border-gray-300 text-gray-700',
 };
 
 const STATE_LABELS: Record<Exclude<DayState, 'future' | 'notDue'>, string> = {

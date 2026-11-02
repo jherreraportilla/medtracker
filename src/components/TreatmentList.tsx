@@ -22,7 +22,7 @@ export function TreatmentList({ treatments, intakes, todayKey, onNew, onEdit, on
 
   function renderCard(t: Treatment) {
     return (
-      <li key={t.id} className="space-y-3 rounded-lg border border-gray-200 p-4">
+      <li key={t.id} className="space-y-3 rounded-lg border border-gray-200/80 bg-white/30 p-4">
         <div className="flex items-start gap-3">
           <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: t.color }} aria-hidden="true" />
           <div className="min-w-0 flex-1">
@@ -57,7 +57,7 @@ export function TreatmentList({ treatments, intakes, todayKey, onNew, onEdit, on
   }
 
   return (
-    <section className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 text-gray-900 shadow-sm">
+    <section className="space-y-4 glass-card rounded-xl p-5 text-gray-900">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Tratamientos</h2>
         <button

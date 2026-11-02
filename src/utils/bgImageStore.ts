@@ -28,23 +28,32 @@ function getDb(): Promise<IDBPDatabase<ThemeDB>> {
   return dbPromise;
 }
 
+async function decodeImage(file: File): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function downscale(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const longSide = Math.max(bitmap.width, bitmap.height);
+  const img = await decodeImage(file);
+  const longSide = Math.max(img.naturalWidth, img.naturalHeight);
   const scale = longSide > MAX_SIDE ? MAX_SIDE / longSide : 1;
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const width = Math.max(1, Math.round(img.naturalWidth * scale));
+  const height = Math.max(1, Math.round(img.naturalHeight * scale));
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    bitmap.close();
-    throw new Error('No se pudo crear el canvas para la imagen de fondo');
-  }
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
+  if (!ctx) throw new Error('No se pudo crear el canvas para la imagen de fondo');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, width, height);
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

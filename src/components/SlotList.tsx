@@ -24,8 +24,8 @@ export function SlotList({ slots, onToggle, disabled = false }: Props) {
               aria-pressed={taken}
               className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 taken
-                  ? 'border-emerald-200 bg-emerald-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+                  ? 'border-emerald-200/80 bg-emerald-50/70'
+                  : 'border-gray-200/80 bg-white/50 hover:border-gray-300'
               }`}
             >
               <span

@@ -87,7 +87,7 @@ export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 text-gray-900 shadow-sm"
+      className="space-y-4 glass-card rounded-xl p-5 text-gray-900"
     >
       <h2 className="text-lg font-semibold">{initial ? 'Editar tratamiento' : 'Nuevo tratamiento'}</h2>
 

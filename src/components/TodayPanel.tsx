@@ -12,7 +12,7 @@ export function TodayPanel({ todayKey, slots, onToggle }: Props) {
   const taken = slots.filter((s) => s.intake).length;
 
   return (
-    <section className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 text-gray-900 shadow-sm">
+    <section className="space-y-4 glass-card rounded-xl p-5 text-gray-900">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Hoy</h2>

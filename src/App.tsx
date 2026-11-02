@@ -12,7 +12,12 @@ import { getTextColorForBackground, TEXT_DARK, TEXT_LIGHT } from './utils/contra
 import { toLocalDateKey, toMonthKey } from './utils/dates';
 import { listIntakes, markIntake, unmarkIntake } from './utils/intakeStore';
 import { buildDaySlots } from './utils/schedule';
-import { getStoredBgColor, setStoredBgColor } from './utils/themeStore';
+import {
+  getStoredBgColor,
+  getStoredGlassTransparency,
+  setStoredBgColor,
+  setStoredGlassTransparency,
+} from './utils/themeStore';
 import { deleteTreatment, listTreatments, saveTreatment, updateTreatment } from './utils/treatmentStore';
 
 function currentDateKey(): string {
@@ -30,33 +35,46 @@ export default function App() {
   const [bgColor, setBgColor] = useState(getStoredBgColor);
   const [previewColor, setPreviewColor] = useState<string | null>(null);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [glassTransparency, setGlassTransparency] = useState(getStoredGlassTransparency);
 
   useEffect(() => {
-    listTreatments().then(setTreatments).catch(() => setTreatments([]));
-    listIntakes().then(setIntakes).catch(() => setIntakes([]));
-  }, []);
-
-  useEffect(() => {
-    function refreshToday() {
-      setTodayKey(currentDateKey());
+    function loadData() {
+      Promise.all([listTreatments(), listIntakes()])
+        .then(([loadedTreatments, loadedIntakes]) => {
+          setTreatments(loadedTreatments);
+          setIntakes(loadedIntakes);
+          setError(null);
+        })
+        .catch(() => setError('No se pudieron cargar los datos guardados. Cierra y vuelve a abrir la app.'));
     }
-    document.addEventListener('visibilitychange', refreshToday);
-    window.addEventListener('focus', refreshToday);
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return;
+      setTodayKey(currentDateKey());
+      loadData();
+    }
+    function onPageShow(e: PageTransitionEvent) {
+      if (e.persisted) onVisible();
+    }
+    loadData();
+    navigator.storage?.persist?.().catch(() => undefined);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pageshow', onPageShow);
     return () => {
-      document.removeEventListener('visibilitychange', refreshToday);
-      window.removeEventListener('focus', refreshToday);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pageshow', onPageShow);
     };
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     let createdUrl: string | null = null;
     loadBgImage().then((blob) => {
-      if (blob) {
-        createdUrl = URL.createObjectURL(blob);
-        setBgImageUrl(createdUrl);
-      }
+      if (!blob || cancelled) return;
+      createdUrl = URL.createObjectURL(blob);
+      setBgImageUrl(createdUrl);
     });
     return () => {
+      cancelled = true;
       if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
   }, []);
@@ -69,12 +87,19 @@ export default function App() {
     root.style.setProperty('--app-bg', effective);
     root.style.setProperty('--app-text', textColor);
     if (bgImageUrl) {
-      const scrim = mode === 'light' ? 'rgba(17, 24, 39, 0.55)' : 'rgba(249, 250, 251, 0.6)';
+      const scrim = mode === 'light' ? 'rgba(17, 24, 39, 0.12)' : 'rgba(249, 250, 251, 0.12)';
+      const shadow = mode === 'light' ? 'rgba(17, 24, 39, 0.6)' : 'rgba(249, 250, 251, 0.7)';
       root.style.setProperty('--app-bg-image', `linear-gradient(${scrim}, ${scrim}), url("${bgImageUrl}")`);
+      root.style.setProperty('--app-text-shadow', `0 1px 3px ${shadow}`);
     } else {
       root.style.setProperty('--app-bg-image', 'none');
+      root.style.setProperty('--app-text-shadow', 'none');
     }
   }, [bgColor, previewColor, bgImageUrl]);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--glass-alpha', String(1 - glassTransparency / 100));
+  }, [glassTransparency]);
 
   const todaySlots = useMemo(() => buildDaySlots(treatments, intakes, todayKey), [treatments, intakes, todayKey]);
   const selectedSlots = useMemo(
@@ -86,6 +111,11 @@ export default function App() {
     setBgColor(color);
     setStoredBgColor(color);
     setPreviewColor(null);
+  }
+
+  function changeGlassTransparency(value: number) {
+    setGlassTransparency(value);
+    setStoredGlassTransparency(value);
   }
 
   async function changeBgImage(file: File) {
@@ -183,6 +213,8 @@ export default function App() {
             hasImage={bgImageUrl !== null}
             onImageSelect={changeBgImage}
             onImageRemove={removeBgImage}
+            glassTransparency={glassTransparency}
+            onGlassTransparencyChange={changeGlassTransparency}
           />
         </header>
 
@@ -204,7 +236,7 @@ export default function App() {
           <>
             <TodayPanel todayKey={todayKey} slots={todaySlots} onToggle={(s) => toggleSlot(todayKey, s)} />
 
-            <section className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 text-gray-900 shadow-sm">
+            <section className="space-y-4 glass-card rounded-xl p-5 text-gray-900">
               <MonthCalendar
                 monthKey={monthKey}
                 todayKey={todayKey}

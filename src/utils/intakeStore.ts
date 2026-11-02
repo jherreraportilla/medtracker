@@ -1,13 +1,12 @@
 import type { Intake } from '../types/treatment';
-import { getDb } from './pillDb';
+import { withDb } from './pillDb';
 
 export function intakeId(treatmentId: string, date: string, slot: number): string {
   return `${treatmentId}|${date}|${slot}`;
 }
 
-export async function listIntakes(): Promise<Intake[]> {
-  const db = await getDb();
-  return db.getAllFromIndex('intakes', 'by-date');
+export function listIntakes(): Promise<Intake[]> {
+  return withDb((db) => db.getAllFromIndex('intakes', 'by-date'));
 }
 
 export async function markIntake(treatmentId: string, date: string, slot: number): Promise<Intake> {
@@ -18,12 +17,16 @@ export async function markIntake(treatmentId: string, date: string, slot: number
     slot,
     takenAt: Date.now(),
   };
-  const db = await getDb();
-  await db.put('intakes', intake);
+  await withDb(async (db) => {
+    const tx = db.transaction('intakes', 'readwrite', { durability: 'strict' });
+    await Promise.all([tx.store.put(intake), tx.done]);
+  });
   return intake;
 }
 
 export async function unmarkIntake(treatmentId: string, date: string, slot: number): Promise<void> {
-  const db = await getDb();
-  await db.delete('intakes', intakeId(treatmentId, date, slot));
+  await withDb(async (db) => {
+    const tx = db.transaction('intakes', 'readwrite', { durability: 'strict' });
+    await Promise.all([tx.store.delete(intakeId(treatmentId, date, slot)), tx.done]);
+  });
 }
