@@ -7,8 +7,8 @@ import { TodayPanel } from './components/TodayPanel';
 import { TreatmentForm } from './components/TreatmentForm';
 import { TreatmentList } from './components/TreatmentList';
 import type { DaySlot, Intake, Treatment, TreatmentInput } from './types/treatment';
-import { clearBgImage, loadBgImage, saveBgImage } from './utils/bgImageStore';
-import { getTextColorForBackground, TEXT_DARK, TEXT_LIGHT } from './utils/contrast';
+import { averageImageColor, clearBgImage, loadBgImage, saveBgImage } from './utils/bgImageStore';
+import { getTextColorForBackground, mixHex, TEXT_DARK, TEXT_LIGHT } from './utils/contrast';
 import { toLocalDateKey, toMonthKey } from './utils/dates';
 import { listIntakes, markIntake, unmarkIntake } from './utils/intakeStore';
 import { buildDaySlots } from './utils/schedule';
@@ -35,6 +35,7 @@ export default function App() {
   const [bgColor, setBgColor] = useState(getStoredBgColor);
   const [previewColor, setPreviewColor] = useState<string | null>(null);
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [bgImageColor, setBgImageColor] = useState<string | null>(null);
   const [glassTransparency, setGlassTransparency] = useState(getStoredGlassTransparency);
 
   useEffect(() => {
@@ -80,12 +81,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!bgImageUrl) {
+      setBgImageColor(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(bgImageUrl)
+      .then((res) => res.blob())
+      .then(averageImageColor)
+      .then((color) => {
+        if (!cancelled) setBgImageColor(color);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [bgImageUrl]);
+
+  useEffect(() => {
     const effective = previewColor ?? bgColor;
-    const mode = getTextColorForBackground(effective);
-    const textColor = mode === 'light' ? TEXT_LIGHT : TEXT_DARK;
+    const backdrop = bgImageUrl && bgImageColor ? bgImageColor : effective;
+    const mode = getTextColorForBackground(backdrop);
     const root = document.documentElement;
     root.style.setProperty('--app-bg', effective);
-    root.style.setProperty('--app-text', textColor);
+    root.style.setProperty('--app-text', mode === 'light' ? TEXT_LIGHT : TEXT_DARK);
     if (bgImageUrl) {
       const scrim = mode === 'light' ? 'rgba(17, 24, 39, 0.12)' : 'rgba(249, 250, 251, 0.12)';
       const shadow = mode === 'light' ? 'rgba(17, 24, 39, 0.6)' : 'rgba(249, 250, 251, 0.7)';
@@ -95,11 +114,12 @@ export default function App() {
       root.style.setProperty('--app-bg-image', 'none');
       root.style.setProperty('--app-text-shadow', 'none');
     }
-  }, [bgColor, previewColor, bgImageUrl]);
 
-  useEffect(() => {
-    document.documentElement.style.setProperty('--glass-alpha', String(1 - glassTransparency / 100));
-  }, [glassTransparency]);
+    const glassAlpha = 1 - glassTransparency / 100;
+    const lightGlass = mixHex('#ffffff', backdrop, glassAlpha);
+    root.style.setProperty('--glass-alpha', String(glassAlpha));
+    root.dataset.glassTone = getTextColorForBackground(lightGlass) === 'light' ? 'dark' : 'light';
+  }, [bgColor, previewColor, bgImageUrl, bgImageColor, glassTransparency]);
 
   const todaySlots = useMemo(() => buildDaySlots(treatments, intakes, todayKey), [treatments, intakes, todayKey]);
   const selectedSlots = useMemo(

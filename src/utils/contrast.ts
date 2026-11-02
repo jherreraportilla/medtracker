@@ -29,6 +29,21 @@ export function hexToRgb(hex: string): Rgb {
   };
 }
 
+export function rgbToHex({ r, g, b }: Rgb): string {
+  return `#${[r, g, b].map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function mixHex(top: string, bottom: string, topWeight: number): string {
+  const a = hexToRgb(top);
+  const b = hexToRgb(bottom);
+  const w = Math.min(1, Math.max(0, topWeight));
+  return rgbToHex({
+    r: a.r * w + b.r * (1 - w),
+    g: a.g * w + b.g * (1 - w),
+    b: a.b * w + b.b * (1 - w),
+  });
+}
+
 function gammaChannel(channel: number): number {
   const c = channel / 255;
   return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);

@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { rgbToHex } from './contrast';
 
 interface ThemeDB extends DBSchema {
   background: {
@@ -28,7 +29,7 @@ function getDb(): Promise<IDBPDatabase<ThemeDB>> {
   return dbPromise;
 }
 
-async function decodeImage(file: File): Promise<HTMLImageElement> {
+async function decodeImage(file: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
@@ -62,6 +63,29 @@ async function downscale(file: File): Promise<Blob> {
       JPEG_QUALITY
     );
   });
+}
+
+const SAMPLE_SIDE = 16;
+
+export async function averageImageColor(blob: Blob): Promise<string> {
+  const img = await decodeImage(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = SAMPLE_SIDE;
+  canvas.height = SAMPLE_SIDE;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('No se pudo analizar la imagen de fondo');
+  ctx.drawImage(img, 0, 0, SAMPLE_SIDE, SAMPLE_SIDE);
+  const { data } = ctx.getImageData(0, 0, SAMPLE_SIDE, SAMPLE_SIDE);
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i];
+    g += data[i + 1];
+    b += data[i + 2];
+  }
+  const pixels = data.length / 4;
+  return rgbToHex({ r: r / pixels, g: g / pixels, b: b / pixels });
 }
 
 export async function saveBgImage(file: File): Promise<Blob> {
