@@ -7,7 +7,6 @@
   isolation: isolate;
   background-color: var(--app-bg, #f9fafb);
   color: var(--app-text, #111827);
-  text-shadow: var(--app-text-shadow, none);
 }
 
 .app-shell::before {
@@ -28,23 +27,26 @@
 
 .glass-card {
   background-color: rgb(255 255 255 / var(--glass-alpha, 0.55));
-  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(180%);
-  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(160%) contrast(var(--glass-contrast, 1))
+    brightness(var(--glass-brightness, 1));
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(160%) contrast(var(--glass-contrast, 1))
+    brightness(var(--glass-brightness, 1));
   border: 1px solid rgb(255 255 255 / 0.55);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.7),
     inset 0 -1px 0 rgb(255 255 255 / 0.15),
     0 8px 32px rgb(15 23 42 / 0.14);
-  text-shadow: none;
 }
 
 .glass-card--solid {
   background-color: rgb(255 255 255 / max(var(--glass-alpha, 0.55), 0.8));
 }
 
-.glass-card .text-gray-400 { color: #6b7280; }
-.glass-card .text-gray-500 { color: #4b5563; }
-.glass-card .text-gray-600 { color: #374151; }
+.glass-card .text-gray-400 { color: color-mix(in srgb, #374151 var(--glass-text-boost, 0%), #6b7280); }
+.glass-card .text-gray-500 { color: color-mix(in srgb, #111827 var(--glass-text-boost, 0%), #4b5563); }
+.glass-card :is(.text-gray-600, .text-gray-700):not(input, select, textarea, .bg-white) {
+  color: color-mix(in srgb, #111827 var(--glass-text-boost, 0%), #374151);
+}
 
 :root[data-glass-tone='dark'] .glass-card {
   background-color: rgb(17 24 39 / var(--glass-alpha, 0.55));
@@ -61,12 +63,14 @@
 }
 
 :root[data-glass-tone='dark'] .glass-card :is(.text-gray-900, .text-gray-700):not(input, select, textarea, .bg-white) {
-  color: #f3f4f6;
+  color: color-mix(in srgb, #f9fafb var(--glass-text-boost, 0%), #f3f4f6);
 }
 :root[data-glass-tone='dark'] .glass-card :is(.text-gray-600, .text-gray-500):not(input, select, textarea, .bg-white) {
-  color: #d1d5db;
+  color: color-mix(in srgb, #f9fafb var(--glass-text-boost, 0%), #d1d5db);
 }
-:root[data-glass-tone='dark'] .glass-card .text-gray-400 { color: #9ca3af; }
+:root[data-glass-tone='dark'] .glass-card .text-gray-400 {
+  color: color-mix(in srgb, #e5e7eb var(--glass-text-boost, 0%), #9ca3af);
+}
 :root[data-glass-tone='dark'] .glass-card .text-emerald-700 { color: #6ee7b7; }
 :root[data-glass-tone='dark'] .glass-card .text-emerald-900 { color: #a7f3d0; }
 :root[data-glass-tone='dark'] .glass-card .text-amber-900 { color: #fde68a; }
@@ -98,4 +102,8 @@
 :root[data-glass-tone='dark'] .glass-card .bg-rose-50\/70 {
   background-color: rgb(244 63 94 / 0.2);
   border-color: rgb(253 164 175 / 0.35);
+}
+
+.glass-card :is(.text-gray-400, .text-gray-500, .text-gray-600, .text-gray-700):not(input, select, textarea, .bg-white) {
+  -webkit-text-stroke: var(--glass-text-stroke, 0) currentColor;
 }

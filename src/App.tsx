@@ -15,10 +15,14 @@ import { buildDaySlots } from './utils/schedule';
 import {
   getStoredBgColor,
   getStoredGlassTransparency,
+  MAX_GLASS_TRANSPARENCY,
   setStoredBgColor,
   setStoredGlassTransparency,
 } from './utils/themeStore';
 import { deleteTreatment, listTreatments, saveTreatment, updateTreatment } from './utils/treatmentStore';
+
+const TEXT_BOOST_FROM = 30;
+const TEXT_BOOST_TO = 70;
 
 function currentDateKey(): string {
   return toLocalDateKey(new Date());
@@ -107,18 +111,23 @@ export default function App() {
     root.style.setProperty('--app-text', mode === 'light' ? TEXT_LIGHT : TEXT_DARK);
     if (bgImageUrl) {
       const scrim = mode === 'light' ? 'rgba(17, 24, 39, 0.12)' : 'rgba(249, 250, 251, 0.12)';
-      const shadow = mode === 'light' ? 'rgba(17, 24, 39, 0.6)' : 'rgba(249, 250, 251, 0.7)';
       root.style.setProperty('--app-bg-image', `linear-gradient(${scrim}, ${scrim}), url("${bgImageUrl}")`);
-      root.style.setProperty('--app-text-shadow', `0 1px 3px ${shadow}`);
     } else {
       root.style.setProperty('--app-bg-image', 'none');
-      root.style.setProperty('--app-text-shadow', 'none');
     }
 
     const glassAlpha = 1 - glassTransparency / 100;
     const lightGlass = mixHex('#ffffff', backdrop, glassAlpha);
+    const tone = getTextColorForBackground(lightGlass) === 'light' ? 'dark' : 'light';
+    const strength = glassTransparency / MAX_GLASS_TRANSPARENCY;
     root.style.setProperty('--glass-alpha', String(glassAlpha));
-    root.dataset.glassTone = getTextColorForBackground(lightGlass) === 'light' ? 'dark' : 'light';
+    root.style.setProperty('--glass-blur', `${Math.round(16 + 12 * strength)}px`);
+    root.style.setProperty('--glass-contrast', String(1 - 0.55 * strength));
+    root.style.setProperty('--glass-brightness', String(tone === 'light' ? 1 + 0.45 * strength : 1 - 0.5 * strength));
+    root.dataset.glassTone = tone;
+    const textBoost = Math.min(1, Math.max(0, (glassTransparency - TEXT_BOOST_FROM) / (TEXT_BOOST_TO - TEXT_BOOST_FROM)));
+    root.style.setProperty('--glass-text-boost', `${Math.round(textBoost * 100)}%`);
+    root.style.setProperty('--glass-text-stroke', `${(0.35 * textBoost).toFixed(3)}px`);
   }, [bgColor, previewColor, bgImageUrl, bgImageColor, glassTransparency]);
 
   const todaySlots = useMemo(() => buildDaySlots(treatments, intakes, todayKey), [treatments, intakes, todayKey]);
@@ -220,10 +229,10 @@ export default function App() {
   return (
     <div className="app-shell min-h-screen">
       <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
-        <header className="flex items-start justify-between gap-3">
+        <header className="glass-card relative z-10 flex items-start justify-between gap-3 rounded-xl p-5 text-gray-900">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold">Control de medicación</h1>
-            <p className="text-sm opacity-70">Marca tus tomas y sigue el progreso de cada tratamiento.</p>
+            <p className="text-sm text-gray-600">Marca tus tomas y sigue el progreso de cada tratamiento.</p>
           </div>
           <BackgroundColorPicker
             value={bgColor}
