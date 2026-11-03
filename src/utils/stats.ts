@@ -41,7 +41,6 @@ export function treatmentProgress(
     totalDays: endDate ? daysBetween(startDate, endDate) + 1 : undefined,
     expectedIntakes,
     takenIntakes,
-    adherence: expectedIntakes > 0 ? takenIntakes / expectedIntakes : 0,
     currentStreak: runningStreak,
     longestStreak,
   };

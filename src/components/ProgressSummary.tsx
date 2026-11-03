@@ -2,12 +2,10 @@ import type { TreatmentProgress } from '../types/treatment';
 
 interface Props {
   progress: TreatmentProgress;
-  color: string;
 }
 
-export function ProgressSummary({ progress, color }: Props) {
-  const { dayNumber, totalDays, takenIntakes, expectedIntakes, adherence, currentStreak, longestStreak } = progress;
-  const percent = Math.round(adherence * 100);
+export function ProgressSummary({ progress }: Props) {
+  const { dayNumber, totalDays, takenIntakes, expectedIntakes, currentStreak, longestStreak } = progress;
 
   if (dayNumber === 0) {
     return <p className="text-xs text-gray-500">Aún no ha empezado.</p>;
@@ -15,13 +13,9 @@ export function ProgressSummary({ progress, color }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-2 gap-2 text-center">
         <Stat label="Día" value={totalDays ? `${dayNumber} / ${totalDays}` : String(dayNumber)} />
-        <Stat label="Adherencia" value={`${percent}%`} />
         <Stat label="Racha" value={`${currentStreak} d`} hint={`Máx. ${longestStreak} d`} />
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-        <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
       </div>
       <p className="text-[11px] text-gray-500">
         {takenIntakes} de {expectedIntakes} tomas registradas

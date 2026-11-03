@@ -56,7 +56,7 @@ export function TreatmentList({
 
         <DurationLine treatment={t} todayKey={todayKey} />
 
-        {t.startDate <= todayKey && <ProgressSummary progress={treatmentProgress(t, intakes, todayKey)} color={t.color} />}
+        {t.startDate <= todayKey && <ProgressSummary progress={treatmentProgress(t, intakes, todayKey)} />}
 
         {t.stock && remaining !== null && (
           <div

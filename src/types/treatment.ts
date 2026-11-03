@@ -56,7 +56,6 @@ export interface TreatmentProgress {
   totalDays?: number;
   expectedIntakes: number;
   takenIntakes: number;
-  adherence: number;
   currentStreak: number;
   longestStreak: number;
 }
