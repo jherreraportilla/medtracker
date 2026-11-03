@@ -8,6 +8,15 @@ export interface Frequency {
   times?: string[];
 }
 
+export interface Stock {
+  pillsPerBlister: number;
+  blistersPerBox: number;
+  pillsPerIntake: number;
+  alertAt: number;
+  pills: number;
+  countedAt: number;
+}
+
 export interface Treatment {
   id: string;
   name: string;
@@ -17,6 +26,7 @@ export interface Treatment {
   endDate?: string;
   notes?: string;
   color: string;
+  stock?: Stock;
   archived: boolean;
   createdAt: number;
 }
@@ -29,6 +39,7 @@ export interface Intake {
   date: string;
   slot: number;
   takenAt: number;
+  backfilled?: boolean;
 }
 
 export interface DaySlot {

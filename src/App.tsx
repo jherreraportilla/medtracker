@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AlertsPanel } from './components/AlertsPanel';
+import { AppointmentsPanel } from './components/AppointmentsPanel';
 import { BackgroundColorPicker } from './components/BackgroundColorPicker';
 import { DayDetail } from './components/DayDetail';
 import { IosInstallHint } from './components/IosInstallHint';
@@ -6,12 +8,15 @@ import { MonthCalendar } from './components/MonthCalendar';
 import { TodayPanel } from './components/TodayPanel';
 import { TreatmentForm } from './components/TreatmentForm';
 import { TreatmentList } from './components/TreatmentList';
+import type { Appointment, AppointmentInput } from './types/appointment';
 import type { DaySlot, Intake, Treatment, TreatmentInput } from './types/treatment';
+import { deleteAppointment, listAppointments, saveAppointment, updateAppointment } from './utils/appointmentStore';
 import { averageImageColor, clearBgImage, loadBgImage, saveBgImage } from './utils/bgImageStore';
 import { getTextColorForBackground, mixHex, TEXT_DARK, TEXT_LIGHT } from './utils/contrast';
 import { toLocalDateKey, toMonthKey } from './utils/dates';
-import { listIntakes, markIntake, unmarkIntake } from './utils/intakeStore';
-import { buildDaySlots } from './utils/schedule';
+import { listIntakes, markIntake, putIntakes, unmarkIntake } from './utils/intakeStore';
+import { buildBackfill, buildDaySlots } from './utils/schedule';
+import { pillsPerBox, remainingPills, roundPills } from './utils/stock';
 import {
   getStoredBgColor,
   getStoredGlassTransparency,
@@ -31,6 +36,7 @@ function currentDateKey(): string {
 export default function App() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [intakes, setIntakes] = useState<Intake[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [todayKey, setTodayKey] = useState(currentDateKey);
   const [monthKey, setMonthKey] = useState(() => toMonthKey(currentDateKey()));
   const [selectedKey, setSelectedKey] = useState(currentDateKey);
@@ -44,10 +50,11 @@ export default function App() {
 
   useEffect(() => {
     function loadData() {
-      Promise.all([listTreatments(), listIntakes()])
-        .then(([loadedTreatments, loadedIntakes]) => {
+      Promise.all([listTreatments(), listIntakes(), listAppointments()])
+        .then(([loadedTreatments, loadedIntakes, loadedAppointments]) => {
           setTreatments(loadedTreatments);
           setIntakes(loadedIntakes);
+          setAppointments(loadedAppointments);
           setError(null);
         })
         .catch(() => setError('No se pudieron cargar los datos guardados. Cierra y vuelve a abrir la app.'));
@@ -221,6 +228,69 @@ export default function App() {
     }
   }
 
+  async function persistTreatment(updated: Treatment) {
+    await updateTreatment(updated);
+    setTreatments((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  }
+
+  async function addBox(treatment: Treatment) {
+    if (!treatment.stock) return;
+    setError(null);
+    const remaining = remainingPills(treatment, intakes) ?? 0;
+    try {
+      await persistTreatment({
+        ...treatment,
+        stock: {
+          ...treatment.stock,
+          pills: roundPills(remaining + pillsPerBox(treatment.stock)),
+          countedAt: Date.now(),
+        },
+      });
+    } catch {
+      setError('No se pudieron actualizar las existencias.');
+    }
+  }
+
+  async function backfillIntakes(treatment: Treatment, fromKey: string, toKey: string): Promise<number> {
+    const target = fromKey < treatment.startDate ? { ...treatment, startDate: fromKey } : treatment;
+    const created = buildBackfill(target, intakes, fromKey, toKey);
+    if (created.length === 0) return 0;
+    if (target !== treatment) await persistTreatment(target);
+    await putIntakes(created);
+    setIntakes((prev) => [...prev, ...created]);
+    return created.length;
+  }
+
+  async function createAppointment(data: AppointmentInput) {
+    const created = await saveAppointment(data);
+    setAppointments((prev) => [...prev, created]);
+  }
+
+  async function changeAppointment(appointment: Appointment) {
+    await updateAppointment(appointment);
+    setAppointments((prev) => prev.map((a) => (a.id === appointment.id ? appointment : a)));
+  }
+
+  async function toggleAppointmentDone(appointment: Appointment) {
+    setError(null);
+    try {
+      await changeAppointment({ ...appointment, done: !appointment.done });
+    } catch {
+      setError('No se pudo actualizar la cita.');
+    }
+  }
+
+  async function removeAppointment(appointment: Appointment) {
+    if (!confirm('¿Eliminar esta cita?')) return;
+    setError(null);
+    try {
+      await deleteAppointment(appointment.id);
+      setAppointments((prev) => prev.filter((a) => a.id !== appointment.id));
+    } catch {
+      setError('No se pudo eliminar la cita.');
+    }
+  }
+
   function selectDay(dateKey: string) {
     setSelectedKey(dateKey);
     setMonthKey(toMonthKey(dateKey));
@@ -257,12 +327,15 @@ export default function App() {
           <TreatmentForm
             key={editing === 'new' ? 'new' : editing.id}
             initial={editing === 'new' ? undefined : editing}
+            initialRemaining={editing === 'new' ? null : remainingPills(editing, intakes)}
             todayKey={todayKey}
             onSubmit={submitTreatment}
             onCancel={() => setEditing(null)}
           />
         ) : (
           <>
+            <AlertsPanel treatments={treatments} intakes={intakes} appointments={appointments} todayKey={todayKey} />
+
             <TodayPanel todayKey={todayKey} slots={todaySlots} onToggle={(s) => toggleSlot(todayKey, s)} />
 
             <section className="space-y-4 glass-card rounded-xl p-5 text-gray-900">
@@ -272,6 +345,7 @@ export default function App() {
                 selectedKey={selectedKey}
                 treatments={treatments}
                 intakes={intakes}
+                appointments={appointments}
                 onMonthChange={setMonthKey}
                 onSelect={selectDay}
               />
@@ -279,6 +353,7 @@ export default function App() {
                 dateKey={selectedKey}
                 todayKey={todayKey}
                 slots={selectedSlots}
+                appointments={appointments}
                 onToggle={(s) => toggleSlot(selectedKey, s)}
               />
             </section>
@@ -291,6 +366,18 @@ export default function App() {
               onEdit={setEditing}
               onToggleArchived={toggleArchived}
               onDelete={removeTreatment}
+              onAddBox={addBox}
+              onBackfill={backfillIntakes}
+            />
+
+            <AppointmentsPanel
+              appointments={appointments}
+              treatments={treatments}
+              todayKey={todayKey}
+              onCreate={createAppointment}
+              onUpdate={changeAppointment}
+              onToggleDone={toggleAppointmentDone}
+              onDelete={removeAppointment}
             />
           </>
         )}

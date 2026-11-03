@@ -30,3 +30,11 @@ export async function unmarkIntake(treatmentId: string, date: string, slot: numb
     await Promise.all([tx.store.delete(intakeId(treatmentId, date, slot)), tx.done]);
   });
 }
+
+export async function putIntakes(intakes: Intake[]): Promise<void> {
+  if (intakes.length === 0) return;
+  await withDb(async (db) => {
+    const tx = db.transaction('intakes', 'readwrite', { durability: 'strict' });
+    await Promise.all([...intakes.map((i) => tx.store.put(i)), tx.done]);
+  });
+}

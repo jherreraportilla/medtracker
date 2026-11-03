@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import type { FrequencyKind, Treatment, TreatmentInput } from '../types/treatment';
+import type { FrequencyKind, Stock, Treatment, TreatmentInput } from '../types/treatment';
 import { WEEKDAY_SHORT, WEEKDAYS_MONDAY_FIRST } from '../utils/schedule';
+import { blisterBreakdown, formatPills, pillsPerBox, roundPills } from '../utils/stock';
 
 interface Props {
   initial?: Treatment;
+  initialRemaining?: number | null;
   todayKey: string;
   onSubmit: (data: TreatmentInput) => Promise<void> | void;
   onCancel: () => void;
@@ -22,8 +24,18 @@ const MAX_TIMES_PER_DAY = 6;
 const inputClass =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200';
 const labelClass = 'block space-y-1 text-sm font-medium text-gray-700';
+const DECIMAL_PATTERN = '[0-9]*([.,][0-9]+)?';
 
-export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) {
+function parseDecimal(text: string): number {
+  const normalized = text.trim().replace(',', '.');
+  return normalized === '' ? Number.NaN : Number(normalized);
+}
+
+function toDecimalText(n: number): string {
+  return String(n).replace('.', ',');
+}
+
+export function TreatmentForm({ initial, initialRemaining, todayKey, onSubmit, onCancel }: Props) {
   const [name, setName] = useState(initial?.name ?? '');
   const [dose, setDose] = useState(initial?.dose ?? '');
   const [kind, setKind] = useState<FrequencyKind>(initial?.frequency.kind ?? 'daily');
@@ -35,6 +47,14 @@ export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) 
   const [endDate, setEndDate] = useState(initial?.endDate ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [color, setColor] = useState(initial?.color ?? TREATMENT_COLORS[0]);
+  const [trackStock, setTrackStock] = useState(Boolean(initial?.stock));
+  const [blistersPerBox, setBlistersPerBox] = useState(initial?.stock?.blistersPerBox ?? 3);
+  const [pillsPerBlister, setPillsPerBlister] = useState(initial?.stock?.pillsPerBlister ?? 10);
+  const [pillsPerIntakeText, setPillsPerIntakeText] = useState(toDecimalText(initial?.stock?.pillsPerIntake ?? 1));
+  const [alertAt, setAlertAt] = useState(initial?.stock?.alertAt ?? 5);
+  const [pillsNowText, setPillsNowText] = useState(toDecimalText(initialRemaining ?? 0));
+  const pillsPerIntake = parseDecimal(pillsPerIntakeText);
+  const pillsNow = parseDecimal(pillsNowText);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -50,6 +70,19 @@ export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) 
     });
   }
 
+  function buildStock(): Stock {
+    const previous = initial?.stock;
+    const keepCount = previous !== undefined && pillsNow === initialRemaining;
+    return {
+      blistersPerBox,
+      pillsPerBlister,
+      pillsPerIntake,
+      alertAt,
+      pills: keepCount ? previous.pills : pillsNow,
+      countedAt: keepCount ? previous.countedAt : Date.now(),
+    };
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return setError('Indica el nombre del medicamento.');
@@ -57,6 +90,13 @@ export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) 
     if (endDate && endDate < startDate) return setError('La fecha de fin no puede ser anterior a la de inicio.');
     if (kind === 'weekdays' && weekdays.length === 0) return setError('Elige al menos un día de la semana.');
     if (kind === 'intervalDays' && intervalDays < 2) return setError('El intervalo debe ser de al menos 2 días.');
+    if (trackStock) {
+      if (!Number.isInteger(blistersPerBox) || blistersPerBox < 1 || !Number.isInteger(pillsPerBlister) || pillsPerBlister < 1) {
+        return setError('Las tabletas por caja y las pastillas por tableta deben ser números enteros mayores que 0.');
+      }
+      if (!(pillsPerIntake > 0)) return setError('Las pastillas por toma deben ser mayores que 0.');
+      if (!(alertAt >= 0) || !(pillsNow >= 0)) return setError('Las cantidades de pastillas no pueden ser negativas.');
+    }
 
     const slotTimes = times.slice(0, timesPerDay);
     setError(null);
@@ -76,6 +116,7 @@ export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) 
         endDate: endDate || undefined,
         notes: notes.trim() || undefined,
         color,
+        stock: trackStock ? buildStock() : undefined,
         archived: initial?.archived ?? false,
       });
     } catch {
@@ -206,6 +247,63 @@ export function TreatmentForm({ initial, todayKey, onSubmit, onCancel }: Props) 
             />
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="space-y-3 rounded-lg border border-gray-200/80 p-3">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={trackStock}
+            onChange={(e) => setTrackStock(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 accent-emerald-600"
+          />
+          Controlar existencias y avisar para comprar
+        </label>
+
+        {trackStock && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <label className={labelClass}>
+                <span>Tabletas por caja</span>
+                <input type="number" min={1} step={1} inputMode="numeric" value={blistersPerBox} onChange={(e) => setBlistersPerBox(Number(e.target.value))} className={inputClass} />
+              </label>
+              <label className={labelClass}>
+                <span>Pastillas por tableta</span>
+                <input type="number" min={1} step={1} inputMode="numeric" value={pillsPerBlister} onChange={(e) => setPillsPerBlister(Number(e.target.value))} className={inputClass} />
+              </label>
+              <label className={labelClass}>
+                <span>Pastillas por toma</span>
+                <input type="text" inputMode="decimal" pattern={DECIMAL_PATTERN} value={pillsPerIntakeText} onChange={(e) => setPillsPerIntakeText(e.target.value)} className={inputClass} />
+              </label>
+              <label className={labelClass}>
+                <span>Avisar cuando queden</span>
+                <input type="number" min={0} step={1} inputMode="numeric" value={alertAt} onChange={(e) => setAlertAt(Number(e.target.value))} className={inputClass} />
+              </label>
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelClass}>
+                <span>Pastillas disponibles ahora</span>
+                <div className="flex gap-2">
+                  <input type="text" inputMode="decimal" pattern={DECIMAL_PATTERN} value={pillsNowText} onChange={(e) => setPillsNowText(e.target.value)} className={inputClass} />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPillsNowText(toDecimalText(roundPills((pillsNow || 0) + pillsPerBox({ blistersPerBox, pillsPerBlister }))))
+                    }
+                    className="shrink-0 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                  >
+                    +1 caja
+                  </button>
+                </div>
+              </label>
+              <p className="text-xs text-gray-500">
+                Una caja son {formatPills(pillsPerBox({ blistersPerBox, pillsPerBlister }))} pastillas.
+                {pillsNow > 0 && pillsPerBlister > 0 && ` Tienes ${blisterBreakdown(pillsPerBlister, pillsNow)}.`}
+              </p>
+            </div>
+          </>
+        )}
       </fieldset>
 
       <label className={labelClass}>

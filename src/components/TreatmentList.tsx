@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { Intake, Treatment } from '../types/treatment';
-import { formatDateKey } from '../utils/dates';
+import { addDays, durationBetween, formatDateKey, formatDuration } from '../utils/dates';
 import { frequencyLabel } from '../utils/schedule';
 import { treatmentProgress } from '../utils/stats';
+import { blisterBreakdown, daysLeft, formatPills, isLowStock, pillsPerBox, remainingPills } from '../utils/stock';
+import { BackfillForm } from './BackfillForm';
 import { ProgressSummary } from './ProgressSummary';
 
 interface Props {
@@ -13,14 +15,31 @@ interface Props {
   onEdit: (treatment: Treatment) => void;
   onToggleArchived: (treatment: Treatment) => void;
   onDelete: (treatment: Treatment) => void;
+  onAddBox: (treatment: Treatment) => void;
+  onBackfill: (treatment: Treatment, fromKey: string, toKey: string) => Promise<number>;
 }
 
-export function TreatmentList({ treatments, intakes, todayKey, onNew, onEdit, onToggleArchived, onDelete }: Props) {
+const LONG_DATE: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+
+export function TreatmentList({
+  treatments,
+  intakes,
+  todayKey,
+  onNew,
+  onEdit,
+  onToggleArchived,
+  onDelete,
+  onAddBox,
+  onBackfill,
+}: Props) {
   const [showArchived, setShowArchived] = useState(false);
+  const [backfillId, setBackfillId] = useState<string | null>(null);
   const active = treatments.filter((t) => !t.archived);
   const archived = treatments.filter((t) => t.archived);
 
   function renderCard(t: Treatment) {
+    const remaining = remainingPills(t, intakes);
+    const low = isLowStock(t, remaining);
     return (
       <li key={t.id} className="space-y-3 rounded-lg border border-gray-200/80 bg-white/30 p-4">
         <div className="flex items-start gap-3">
@@ -31,17 +50,57 @@ export function TreatmentList({ treatments, intakes, todayKey, onNew, onEdit, on
               {t.dose && <span className="font-normal text-gray-500"> · {t.dose}</span>}
             </p>
             <p className="text-xs text-gray-500">{frequencyLabel(t.frequency)}</p>
-            <p className="text-xs text-gray-500">
-              Desde {formatDateKey(t.startDate, { day: 'numeric', month: 'short', year: 'numeric' })}
-              {t.endDate && ` hasta ${formatDateKey(t.endDate, { day: 'numeric', month: 'short', year: 'numeric' })}`}
-            </p>
             {t.notes && <p className="mt-1 text-xs italic text-gray-500">{t.notes}</p>}
           </div>
         </div>
 
-        <ProgressSummary progress={treatmentProgress(t, intakes, todayKey)} color={t.color} />
+        <DurationLine treatment={t} todayKey={todayKey} />
+
+        {t.startDate <= todayKey && <ProgressSummary progress={treatmentProgress(t, intakes, todayKey)} color={t.color} />}
+
+        {t.stock && remaining !== null && (
+          <div
+            className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${
+              low ? 'border-amber-200/80 bg-amber-50/70 text-amber-900' : 'border-gray-200/80 bg-white/40 text-gray-700'
+            }`}
+          >
+            <div className="min-w-0">
+              <p className="font-semibold">
+                {low ? 'Quedan pocas, toca comprar' : 'Existencias'}: {formatPills(remaining)}{' '}
+                {remaining === 1 ? 'pastilla' : 'pastillas'}
+              </p>
+              <p className={low ? '' : 'text-gray-500'}>
+                {[blisterBreakdown(t.stock.pillsPerBlister, remaining), stockDaysLabel(t, remaining)]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAddBox(t)}
+              title={`Añadir una caja (${formatPills(pillsPerBox(t.stock))} pastillas)`}
+              className="shrink-0 rounded-md border border-emerald-600 px-2 py-1 font-medium text-emerald-700 hover:bg-emerald-50"
+            >
+              +1 caja
+            </button>
+          </div>
+        )}
+
+        {backfillId === t.id && (
+          <BackfillForm
+            treatment={t}
+            todayKey={todayKey}
+            onSubmit={(from, to) => onBackfill(t, from, to)}
+            onClose={() => setBackfillId(null)}
+          />
+        )}
 
         <div className="flex flex-wrap justify-end gap-1 text-xs font-medium">
+          {backfillId !== t.id && (
+            <button type="button" onClick={() => setBackfillId(t.id)} className="rounded-md px-2 py-1 text-emerald-700 hover:bg-emerald-50">
+              Tomas anteriores
+            </button>
+          )}
           <button type="button" onClick={() => onEdit(t)} className="rounded-md px-2 py-1 text-emerald-700 hover:bg-emerald-50">
             Editar
           </button>
@@ -90,6 +149,39 @@ export function TreatmentList({ treatments, intakes, todayKey, onNew, onEdit, on
         </div>
       )}
     </section>
+  );
+}
+
+function stockDaysLabel(treatment: Treatment, remaining: number): string | null {
+  const days = daysLeft(treatment, remaining);
+  if (days === null) return null;
+  return days === 1 ? 'para 1 día' : `para unos ${days} días`;
+}
+
+function DurationLine({ treatment, todayKey }: { treatment: Treatment; todayKey: string }) {
+  const { startDate, endDate } = treatment;
+  const start = formatDateKey(startDate, LONG_DATE);
+
+  if (startDate > todayKey) {
+    return <p className="rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600">Empieza el {start}.</p>;
+  }
+
+  const finished = endDate !== undefined && endDate < todayKey;
+  const lastKey = finished ? endDate : todayKey;
+  const duration = formatDuration(durationBetween(startDate, addDays(lastKey, 1)));
+
+  return (
+    <div className="rounded-lg bg-white/40 px-3 py-2 text-xs text-gray-600">
+      <p>
+        {finished
+          ? `Del ${start} al ${formatDateKey(lastKey, LONG_DATE)}`
+          : `Desde el ${start} hasta hoy, ${formatDateKey(todayKey, LONG_DATE)}`}
+      </p>
+      <p className="text-sm font-semibold text-gray-900">
+        {finished ? 'Duró' : 'Lleva'} {duration}
+      </p>
+      {!finished && endDate && <p className="text-gray-500">Termina el {formatDateKey(endDate, LONG_DATE)}.</p>}
+    </div>
   );
 }
 

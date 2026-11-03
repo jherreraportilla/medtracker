@@ -1,5 +1,5 @@
 import type { DaySlot, DayState, Frequency, Intake, Treatment } from '../types/treatment';
-import { daysBetween, weekdayOf } from './dates';
+import { addDays, daysBetween, fromLocalDateKey, weekdayOf } from './dates';
 import { intakeId } from './intakeStore';
 
 export const WEEKDAY_SHORT = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
@@ -61,4 +61,34 @@ export function frequencyLabel(frequency: Frequency): string {
       return `${times} al día · ${days}`;
     }
   }
+}
+
+const DEFAULT_BACKFILL_TIME = '12:00';
+
+function slotInstant(dateKey: string, time: string | undefined): number {
+  const [h, m] = (time || DEFAULT_BACKFILL_TIME).split(':').map(Number);
+  const d = fromLocalDateKey(dateKey);
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
+}
+
+export function buildBackfill(treatment: Treatment, intakes: Intake[], fromKey: string, toKey: string): Intake[] {
+  const existing = new Set(intakes.filter((i) => i.treatmentId === treatment.id).map((i) => i.id));
+  const created: Intake[] = [];
+  for (let key = fromKey; key <= toKey; key = addDays(key, 1)) {
+    if (!isDueOn(treatment, key)) continue;
+    for (let slot = 0; slot < treatment.frequency.timesPerDay; slot++) {
+      const id = intakeId(treatment.id, key, slot);
+      if (existing.has(id)) continue;
+      created.push({
+        id,
+        treatmentId: treatment.id,
+        date: key,
+        slot,
+        takenAt: slotInstant(key, treatment.frequency.times?.[slot]),
+        backfilled: true,
+      });
+    }
+  }
+  return created;
 }

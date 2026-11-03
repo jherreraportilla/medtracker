@@ -57,7 +57,7 @@ export function SlotList({ slots, onToggle, disabled = false }: Props) {
               </span>
               <span className="shrink-0 text-right text-xs text-gray-500">
                 {s.time && <span className="block font-medium text-gray-700">{s.time}</span>}
-                {s.intake && (
+                {s.intake && !s.intake.backfilled && (
                   <span className="block">
                     {new Date(s.intake.takenAt).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                   </span>

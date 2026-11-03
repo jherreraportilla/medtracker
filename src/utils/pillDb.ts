@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import type { Appointment } from '../types/appointment';
 import type { Intake, Treatment } from '../types/treatment';
 
 export interface PillDB extends DBSchema {
@@ -12,10 +13,15 @@ export interface PillDB extends DBSchema {
     value: Intake;
     indexes: { 'by-date': string; 'by-treatment': string };
   };
+  appointments: {
+    key: string;
+    value: Appointment;
+    indexes: { 'by-createdAt': number };
+  };
 }
 
 const DB_NAME = 'pill-tracker';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<PillDB>> | null = null;
 
@@ -26,12 +32,18 @@ function resetDb() {
 export function getDb(): Promise<IDBPDatabase<PillDB>> {
   if (!dbPromise) {
     dbPromise = openDB<PillDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        const treatments = db.createObjectStore('treatments', { keyPath: 'id' });
-        treatments.createIndex('by-createdAt', 'createdAt');
-        const intakes = db.createObjectStore('intakes', { keyPath: 'id' });
-        intakes.createIndex('by-date', 'date');
-        intakes.createIndex('by-treatment', 'treatmentId');
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const treatments = db.createObjectStore('treatments', { keyPath: 'id' });
+          treatments.createIndex('by-createdAt', 'createdAt');
+          const intakes = db.createObjectStore('intakes', { keyPath: 'id' });
+          intakes.createIndex('by-date', 'date');
+          intakes.createIndex('by-treatment', 'treatmentId');
+        }
+        if (oldVersion < 2) {
+          const appointments = db.createObjectStore('appointments', { keyPath: 'id' });
+          appointments.createIndex('by-createdAt', 'createdAt');
+        }
       },
       blocking() {
         dbPromise?.then((db) => db.close());

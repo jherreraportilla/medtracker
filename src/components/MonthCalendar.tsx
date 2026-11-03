@@ -1,3 +1,4 @@
+import type { Appointment } from '../types/appointment';
 import type { DayState, Intake, Treatment } from '../types/treatment';
 import { addMonths, daysOfMonth, formatDateKey, weekdayOf } from '../utils/dates';
 import { buildDaySlots, dayState, WEEKDAY_SHORT, WEEKDAYS_MONDAY_FIRST } from '../utils/schedule';
@@ -8,6 +9,7 @@ interface Props {
   selectedKey: string;
   treatments: Treatment[];
   intakes: Intake[];
+  appointments: Appointment[];
   onMonthChange: (monthKey: string) => void;
   onSelect: (dateKey: string) => void;
 }
@@ -32,11 +34,13 @@ export function MonthCalendar({
   selectedKey,
   treatments,
   intakes,
+  appointments,
   onMonthChange,
   onSelect,
 }: Props) {
   const days = daysOfMonth(monthKey);
   const leadingBlanks = (weekdayOf(days[0]) + 6) % 7;
+  const appointmentDays = new Set(appointments.map((a) => a.date));
 
   return (
     <div className="space-y-3">
@@ -69,10 +73,13 @@ export function MonthCalendar({
               type="button"
               onClick={() => onSelect(key)}
               aria-pressed={selected}
-              className={`flex aspect-square min-h-[2.75rem] flex-col items-center justify-between rounded-lg border p-1 text-sm transition-shadow ${CELL_STYLES[state]} ${
+              className={`relative flex aspect-square min-h-[2.75rem] flex-col items-center justify-between rounded-lg border p-1 text-sm transition-shadow ${CELL_STYLES[state]} ${
                 selected ? 'ring-2 ring-emerald-500 ring-offset-1' : ''
               }`}
             >
+              {appointmentDays.has(key) && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rotate-45 bg-current" aria-label="Cita" />
+              )}
               <span className={key === todayKey ? 'font-bold underline underline-offset-2' : 'font-medium'}>
                 {Number(key.slice(8))}
               </span>
@@ -93,6 +100,10 @@ export function MonthCalendar({
             {STATE_LABELS[state]}
           </span>
         ))}
+        <span className="flex items-center gap-1.5">
+          <span className="mx-0.5 h-2 w-2 rotate-45 bg-current" />
+          Cita
+        </span>
       </div>
     </div>
   );
